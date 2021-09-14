@@ -1,0 +1,347 @@
+---
+title: "Lab 1 - Advanced Machine Learning"
+author: "yunan Dong"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE
+                   #   ,out.height = "200px"
+                      )
+```
+
+```{r,include=FALSE }
+library(bnlearn)
+#BiocManager::install("Rgraphviz"，"gRain")
+library(gRain)
+library(magrittr) # %<%
+```
+
+
+# Q1
+
+**Show that multiple runs of the hill-climbing algorithm can return non-equivalent Bayesian network (BN) structures. **
+
+**Explain why this happens. **
+
+Since hill-climbing algorithm is unable to ensure a global optimum, so in each score criterion,different initial values may cause different structures. 
+
+For instance, the related results can be shown below. From the graphs, we can especially see the directions of edges are not all the same.
+
+
+
+**By different start way in each score**
+
+```{r q1-p01}
+
+# listing different scores
+scores = c("loglik","aic","bic","bdla",
+           "bdj","bde","bds","mbde")
+
+
+
+
+#set.seed(1010)
+NN=2 # starting ways
+ReStart = 3  #sample(c(1:1000),N_Re,replace = FALSE)[1] # restart values
+iss_s = 4 #sample(c(1:1000),N_Re,replace = FALSE)[1]
+
+# model results per score
+model_comp_1<-function(scores,NN){  
+  lapply(c(1:NN),function(NN)hc(asia, start = random.graph(nodes = colnames(asia)), 
+                                     restart = ReStart, score =scores#, iss=iss_s 
+                                )   )
+}
+
+
+# combining different scores
+res_model_1 = lapply(scores,function(scores)model_comp_1(scores,NN)   )
+
+
+```
+
+
+Intuitively, by visualizing the results, for some score criterions,esp. aic,bdj,bde,bds..., the results for different initial values have some significant differences in the number of edges.
+
+
+```{r q1-2}
+
+res_plot<-function(score_inx){ 
+  # number 1:8
+  #corresponding to scores = c("loglik","aic","bic","bdla","bdj","bde","bds","mbde")
+  graphviz.compare(res_model_1[[score_inx]][[1]], res_model_1[[score_inx]][[2]],layout='fdp', shape='rectangle')
+
+}
+
+  # select the number in 1:8
+par(mfrow=c(4,4))
+lapply(c(1:8), function(score_inx)res_plot(score_inx) )   
+
+```
+
+
+**Comparing by using the arc numbers**
+
+From the results below, all the results in each score criterion are not equivalent. 
+
+```{r q1-3 }
+# compare(target, current, arcs = FALSE)
+Compare_BN<-function(score_inx){  # 
+  cmp_res = compare(res_model_1[[score_inx]][[1]], res_model_1[[score_inx]][[2]]
+                    #,arcs = TRUE
+                    )
+  
+  ifelse(cmp_res$fn ==cmp_res$fp,"=","!=") 
+}
+
+
+lapply(c(1:8), function(score_inx)Compare_BN(score_inx)   )
+
+
+# using arc number to check difference 
+lapply(c(1:8), function(score_inx)all.equal(res_model_1[[score_inx]][[1]], res_model_1[[score_inx]][[2]])   )
+
+
+```
+
+
+
+
+
+
+# Q2
+ 
+Learn a BN from 80 % of the Asia dataset.
+
+The dataset is included in the bnlearn package. To load the data, run data("asia").
+
+**Learn both the structure and the parameters.**
+
+Use any learning algorithm and settings that you consider appropriate.
+
+Use the BN learned to classify the remaining 20 % of the Asia dataset in two classes:
+
+S = yes and S = no. 
+
+In other words, compute the posterior probability distribution of S for each case and classify it in the most likely class.
+
+To do so, you have to use exact or approximate inference with the help of the bnlearn and gRain packages, 
+i.e. you are not allowed to use functions such as predict. 
+
+Report the confusion matrix, i.e. true/false positives/negatives.
+
+Compare your results with those of the true Asia BN,which can be obtained by running dag = model2network("[A][S][T|A][L|S][B|S][D|B:E][E|T:L][X|E]").
+
+
+Hint: You already know two algorithms for exact inference in BNs: Variable elimination and cluster trees.
+
+There are also approximate algorithms for when the exact ones are too demanding computationally. 
+
+For exact inference, you may need the functions bn.fit and as.grain from the bnlearn package, 
+and the functions compile,setEvidence and querygrain from the package gRain.
+
+For approximate inference, you may need the functions cpquery or cpdist, prop.table and table from the bnlearn package
+
+
+
+## 2.1 train and test
+
+
+```{r q2-0 }
+#asia<-apply(asia, 2, as.character)
+
+#train and test split
+n <- dim(asia)[1]
+set.seed(1010)
+id <- sample(1:n, floor(n*0.8))
+train <- asia[id,]
+
+id1 <- setdiff(1:n, id)
+set.seed(1010)
+id2 <- sample(id1, floor(n*0.2))
+test <- asia[id1,]
+
+```
+
+
+
+```{r q2-1 }
+# Create structure
+structure <- hc(train)
+fit <- bn.fit(x = structure, data = train)  # training data
+fit_grain <- as.grain(fit)
+plot(structure)
+```
+
+
+```{r q2-2}
+
+compiled_grain <- compile(fit_grain)  # necessary syntax to use needed proporties
+
+# Manipulating data, for the function querygrain needs the data to be in character form
+test2 <- test
+test <- apply(test, 2, as.character)
+
+# nodes to S: "A", "T", "L", "B", "E", "X", "D"
+nodes_2_S<-colnames(asia)[-2]
+
+```
+
+
+
+
+```{r q2-3-0}
+
+compiled_obj = compiled_grain
+nodes_from = nodes_2_S  # nodes towards s
+node_to = "S"  # objective variable
+new_data = test[, -2]
+  
+# my prediction function
+my_pred<-function(compiled_obj,nodes_from, node_to,new_data){
+  
+  predictions <- c()
+
+  for (i in 1:nrow(new_data)){
+    evidence <- setEvidence(object = compiled_obj,
+                            nodes = nodes_from,
+                            states = new_data[i,] )
+  
+  posterior <- unlist(querygrain(object = evidence, nodes=node_to))
+  
+  if (posterior[1] > 0.5) {
+    predictions[i] <- "No"} 
+  else {
+    predictions[i] <- "Yes"  }
+  
+  }
+ 
+return(predictions)  
+}
+
+
+
+res=my_pred(compiled_obj,nodes_from, node_to,new_data)
+confusion_matrix <- table(test2$S, res)
+confusion_matrix
+sum(confusion_matrix[c(1,4)])/sum(confusion_matrix)
+```
+
+
+## 2.2 comparing with the true graph
+
+```{r q2-4}
+# True Bayesian Network
+true_dag <- model2network("[A][S][T|A][L|S][B|S][D|B:E][E|T:L][X|E]")
+fit_true <- bn.fit(x = true_dag, data = train)%>%as.grain()
+plot(true_dag)
+```
+```{r q2-5}
+
+# parameters involved
+
+compiled_obj = compile(fit_true)  # true dag model
+nodes_from = nodes_2_S
+node_to = "S"
+new_data = test[, -2]
+
+res=my_pred(compiled_obj,nodes_from, node_to,new_data)
+confusion_matrix <- table(test2$S, res)
+confusion_matrix
+sum(confusion_matrix[c(1,4)])/sum(confusion_matrix)
+```
+
+
+**notes**
+same results with the one above
+
+
+# Q3
+
+In the previous exercise, you classified the variable S given observations for all the rest of the variables. 
+
+Now, you are asked to classify S given observations only for the so-called Markov blanket of S, 
+
+i.e. its parents plus its children plus the parents of its children minus S itself. 
+
+Report again the confusion matrix.
+
+
+Hint: You may want to use the function mb from the bnlearn package
+
+```{r q3 }
+
+markov_blanket <- mb(x = fit, node = "S")
+
+
+# parameters involved
+compiled_obj = compiled_grain  # markov obj
+nodes_from = markov_blanket   # cliques toward S
+node_to = "S"
+new_data = test[, markov_blanket]
+
+# predict
+res=my_pred(compiled_obj,nodes_from, node_to,new_data)
+# res
+confusion_matrix <- table(test2$S, res)
+confusion_matrix
+sum(confusion_matrix[c(1,4)])/sum(confusion_matrix)
+```
+
+
+
+
+# Q4 
+
+Repeat the exercise (2) using a naive Bayes classifier, i.e. the predictive variables are independent given the class variable. 
+See p. 380 in Bishop’s book or Wikipedia for more information on the naive Bayes classifier. 
+
+Model the naive Bayes classifier as a BN. You have to create the BN by hand, i.e. you are not allowed to use the function naive.bayes from the bnlearn package.
+
+```{r q4-0}
+# Naive Bayes:
+naive_bayes = model2network("[S][A|S][T|S][L|S][B|S][E|S][X|S][D|S]")
+plot(naive_bayes)
+# building  object
+naive_bayes <- bn.fit(x = naive_bayes, data = train) %>%as.grain() %>%compile()
+
+
+# parameters involved
+compiled_obj = naive_bayes
+nodes_from = nodes_2_S
+node_to = "S"
+new_data = test[, -2]
+
+# predict
+res=my_pred(compiled_obj,nodes_from, node_to,new_data)
+# res
+confusion_matrix <- table(test2$S, res)
+confusion_matrix
+sum(confusion_matrix[c(1,4)])/sum(confusion_matrix)
+
+```
+
+
+
+
+
+# Q5
+
+Explain why you obtain the same or different results in the exercises (2-4)
+
+
+[lacking the point of why the same ]
+
+
+Through using HC and markov blanket, it gets the same results in predictive rate with 0.721, which also equals that in true structure model. From it, at least it is reasonable to say that the two algorithms in the lab reach the expected effect.
+However, as to naive bayes, the accuracy is lower than the former two with 0.695. The difference lies in the dependence relations in each structure. The assumption of naive bayes is more strict,i.e. each variable is independent, which means it ignores the information existent in the relation of dependence, so the predictive ability is weakened. Conversely, the first two algorithms considered the dependence relation and dig out the needed information from their optimized structures respectively, the predictive effects can be ensured at a higher level that naive bayes does.
+
+
+
+
+
+# Appendix
+
+```{r ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
+```
