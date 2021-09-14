@@ -74,7 +74,7 @@ my_predict <- function(x, y, z, t){
   if (t){
     dag <- model2network("[A][S][T|A][L|S][B|S][D|B:E][E|T:L][X|E]")
   }else{
-    dag <- hc(x, score = "aic")
+    dag <- hc(x)
   }
   #plot the DAG graph
   graphviz.plot(dag)
