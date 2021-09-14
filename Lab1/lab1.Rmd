@@ -1,5 +1,6 @@
 ---
 title: "Lab1"
+author: "Yifan Ding"
 output:
   pdf_document: default
   html_document: default
@@ -34,10 +35,10 @@ init <- model2network("[A][T][B|S][S|L][L][E][X][D]")
 dag3 <-hc(asia, start=init)
 ```
 
-**4.Different restart value**
+**4.AIC Score**
 
 ```{r}
-dag4 <-hc(asia, restart = 12)
+dag4 <-hc(asia, score='aic')
 ```
 
 ```{r, include = FALSE}
@@ -56,9 +57,9 @@ graphviz.compare(dag1, dag2, dag3, dag4, shape = "rectangle", layout = "fdp",
 * 1. $L \longleftarrow S \longrightarrow B$ (Default setting)
 * 2. Sheilded collider $B \longrightarrow L \longrightarrow S$ with $B \longrightarrow S$ (Initial structure $B \longrightarrow L \longrightarrow S$)
 * 3. $L \longrightarrow S \longrightarrow B$ (Initial structure $L \longrightarrow S \longrightarrow B$)
-* 4. $B \longleftarrow S \longleftarrow L$ (Different restart setting)
+* 4. Then got a graph quite unreasonable (Using AIC score)
 
-In case 1,3,4, they are equivalent but with different direction of edges, but case 2 has one more edge than others, thus generated a non-equivalent structures, this might because HC algorithm randomly add, remove and reverse edges, thus sometimes stacks in local optima if we do not have a good start point.
+In case 1,3, they are equivalent with different direction of edges, but case 2 has one more edge than 1,3, case 4 generate a graph with even more edges and quite unreasonable. Therefore under some different setting HC generated non-equivalent structures, this might because HC algorithm randomly add, remove and reverse edges, thus sometimes stacks in local optima if we do not have a good start point.
 
 ## Q1.2
 
@@ -181,3 +182,19 @@ print(table(pred_naive, true=test$S))
 ![](NB.png){#id .class width=50% height=50%}
 
 ## Q1.5
+
+For the results in Q1.5, they are slightly different, this might because I use approximate methods to get parameters, and when do inference on validation set, the probability returned by **cpdist** sometimes is NA, and NA was set as 0.5. This might lead to errors. But actually we have
+
+$$P(S|B,L,E,D,X,T,A) = \frac{P(S)P(B|S)P(L|S)P(E,D,X,T,A|B,L)}{\sum_SP(S)P(B|S)P(L|S)P(E,D,X,T,A|B,L)}$$
+$$~~~~~~~~~~~~~~~~~~~~~~~~=\frac{P(S)P(B|S)P(L|S)}{\sum_SP(S)P(B|S)P(L|S)}=\frac{P(S,B,L)}{P(B,L)}=P(S|B,L)$$
+
+Note $P(S|B,L)$ is Markov blanket of $S$. Regardless the structure of $P(E,D,X,T,A|B,L)$, the partial structure $L\longleftarrow S \longrightarrow B$ is the same in Q1.2 and Q1.3. Above formula hold for all 3 situations, the confusion matrix thus should be the same.
+
+But in Q1.4 the Naive Bayes model is:
+
+$$P(S|B,L,E,D,X,T,A) = \frac{P(S)P(B,L,E,D,X,T,A|S)}{\sum_SP(S)P(B,L,E,D,X,T,A|S)}=\frac{P(S)P(B,L,E,D,X,T,A|S)}{P( B,L,E,D,X,T,A)}$$
+
+in which variables cannot be further estimated. Then this returns a different results, also the accuracy is less than previous Bayesian Network.
+
+
+

@@ -41,10 +41,10 @@ init <- model2network("[A][T][B|S][S|L][L][E][X][D]")
 dag3 <-hc(asia, start=init)
 ```
 
-**4.Different restart value**
+**4.AIC Score**
 
 ```{r}
-dag4 <-hc(asia, restart = 12)
+dag4 <-hc(asia, score='aic')
 ```
 
 ```{r, include = FALSE}
@@ -63,9 +63,9 @@ graphviz.compare(dag1, dag2, dag3, dag4, shape = "rectangle", layout = "fdp",
 * 1. $L \longleftarrow S \longrightarrow B$ (Default setting)
 * 2. Sheilded collider $B \longrightarrow L \longrightarrow S$ with $B \longrightarrow S$ (Initial structure $B \longrightarrow L \longrightarrow S$)
 * 3. $L \longrightarrow S \longrightarrow B$ (Initial structure $L \longrightarrow S \longrightarrow B$)
-* 4. $B \longleftarrow S \longleftarrow L$ (Different restart setting)
+* 4. Then got a graph quite unreasonable (Using AIC score)
 
-In case 1,3,4, they are equivalent but with different direction of edges, but case 2 has one more edge than others, thus generated a non-equivalent structures, this might because HC algorithm randomly add, remove and reverse edges, thus sometimes stacks in local optima if we do not have a good start point.
+In case 1,3, they are equivalent with different direction of edges, but case 2 has one more edge than 1,3, case 4 generate a graph with even more edges and quite unreasonable. Therefore under some different setting HC generated non-equivalent structures, this might because HC algorithm randomly add, remove and reverse edges, thus sometimes stacks in local optima if we do not have a good start point.
 
 ## Q1.2
 
