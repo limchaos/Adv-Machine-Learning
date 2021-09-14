@@ -1,0 +1,216 @@
+---
+title: "AML_Lab1"
+author: "CHAO FU"
+date: "9/10/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(bnlearn)
+library(gRain)
+```
+
+
+### 1
+
+```{r}
+set.seed(10)
+data("asia")
+my_data <- asia
+g1 <- random.graph(names(asia), num = 1, method = "ordered")
+#different initial structure
+my_hc11 <- hc(my_data)
+my_hc12 <- hc(my_data, start = g1)
+#different equivalent sample size on bde
+my_hc21 <- hc(my_data, score = "bde", iss = 1)
+my_hc22 <- hc(my_data, score = "bde", iss = 2)
+#different network score
+my_hc31 <- hc(my_data, score = "bic")
+my_hc32 <- hc(my_data, score = "aic")
+#function to show the comparison result
+comparion <- function(x, y){
+  c1 <- all.equal(x, y)
+  c21 <- cpdag(x)
+  c22 <- cpdag(y)
+  c31 <- vstructs(x)
+  c32 <- vstructs(y)
+  result <- list("allequal" = c1, "cpdag" = list(c21, c22), "vstructs" = list(c31, c32))
+  par(mfrow = c(1, 2))
+  graphviz.compare(x, y)
+ return(result)
+}
+#The comparison on different initial structure
+comparion(my_hc11, my_hc12)
+#The comparison on different equivalent sample size on bde
+comparion(my_hc21, my_hc22)
+#The comparison on different network score
+comparion(my_hc31, my_hc32)
+```
+
+***Comment***
+
+Comparison on three different ways: initial structure, equivalent sample size on bde(Bayesian Dirichlet equivalent uniform score), network score. Each situation get non-equivalent BN structures. The main reason is that hc algorithm may get trapped in local optima. Hence, different parameters lead to different local optima to get different BN structures ultimately when the algorithm get trapped in local optima. However, some reasonable parameters could find the graph approximately to the true BN. When network sore and equivalent sample size are set to "bde" and 2 respectively, the graph is quite similar to the true BN.
+
+### 2
+
+```{r}
+set.seed(10)
+#get train data and test data
+N <- dim(my_data)[1]
+train_id <- sample(seq_len(N), floor(N * 0.8))
+test_id <- setdiff(seq_len(N), train_id)
+train_data <- my_data[train_id, ]
+test_data <- my_data[test_id, ]
+test_node <- c("S")
+#exact inference function
+my_predict <- function(x, y, z, t){
+  #extract conditional nodes
+  id <- names(y)
+  evide_node <- setdiff(id, z)
+  #after t is factor matrix, using as.data.frame to transform
+  evide <- as.data.frame(t(y[, -which(id == z)]))
+  #learn DAG graph based on data
+  if (t){
+    dag <- model2network("[A][S][T|A][L|S][B|S][D|B:E][E|T:L][X|E]")
+  }else{
+    dag <- hc(x, score = "aic")
+  }
+  #plot the DAG graph
+  graphviz.plot(dag)
+  #learn the  parameters based on the graph and data
+  dag_fit <- bn.fit(dag, x)
+  #get grain class to causal inference
+  dag_gr <- as.grain(dag_fit)
+  dag_cp <- compile(dag_gr)
+  #function to calculate probability of causal node
+  dag_cal <- function(e){
+    dag_set <- setFinding(dag_cp, nodes = evide_node, states = e)
+    dag_que <- querygrain(dag_set, nodes = z)
+    return(dag_que[[1]])
+  }
+  #calculate all the prediction
+  all_cal <- lapply(evide, function(x) dag_cal(x))
+  #classify the result for the mostly class
+  pred <- unname(unlist(lapply(all_cal, function(x) names(x[which.max(x)]))))
+  return(pred)
+}
+#confusion matrix
+mypred <- my_predict(train_data, test_data, test_node, FALSE)
+truepred <- my_predict(train_data, test_data, test_node, TRUE)
+table(mypred, test_data$S)
+table(truepred, test_data$S)
+
+```
+
+### 3
+
+```{r}
+set.seed(10)
+#exact inference function for Markov Blanket
+my_predict_mb <- function(x, y, z, t){
+  #generate DAG graph
+  if (t){
+    dag <- model2network("[A][S][T|A][L|S][B|S][D|B:E][E|T:L][X|E]")
+  }else{
+    dag <- hc(x, score = "aic")
+  }
+  #plot the DAG graph
+  graphviz.plot(dag)
+  #learn the  parameters based on the graph and data
+  dag_fit <- bn.fit(dag, x)
+  #get Markov Blanket of node as conditional nodes
+  evide_node <- mb(dag, z)
+  #after t is factor matrix, with as.data.frame to transform
+  evide <- as.data.frame(t(y[, evide_node]))
+  #get grain class to causal inference
+  dag_gr <- as.grain(dag_fit)
+  dag_cp <- compile(dag_gr)
+  #function to calculate probability of causal node
+  dag_cal <- function(e){
+    dag_set <- setFinding(dag_cp, nodes = evide_node, states = e)
+    dag_que <- querygrain(dag_set, nodes = z)
+    return(dag_que[[1]])
+  }
+  #calculate all the prediction
+  all_cal <- lapply(evide, function(x) dag_cal(x))
+  #classify the result for the mostly class
+  pred <- unname(unlist(lapply(all_cal, function(x) names(x[which.max(x)]))))
+  return(pred)
+}
+#confusion matrix
+mypred_mb <- my_predict_mb(train_data, test_data, test_node, FALSE)
+truepred_mb <- my_predict_mb(train_data, test_data, test_node, TRUE)
+table(mypred_mb, test_data$S)
+table(truepred_mb, test_data$S)
+```
+
+### 4
+
+```{r}
+set.seed(10)
+#exact inference function for naive bayes
+my_predict_naive <- function(x, y, z, t){
+  #extract conditional nodes
+  id <- names(y)
+  evide_node <- setdiff(id, z)
+  #after t is factor matrix, with as.data.frame to transform
+  evide <- as.data.frame(t(y[, -which(id == z)]))
+  #generate DAG graph
+  if (t){
+    dag <- model2network("[A][S][T|A][L|S][B|S][D|B:E][E|T:L][X|E]")
+  }else{
+    #creat naive bayes BN by hand 
+    new_vec <- c()
+    dag <- empty.graph(id)
+    for (i in evide_node){
+      new_vec <- append(new_vec, z)
+      new_vec <- append(new_vec, i)
+    }
+    arc.set <-  matrix(new_vec, ncol = 2, byrow = TRUE, dimnames = list(NULL, c("from", "to")))
+    arcs(dag) <- arc.set
+  }
+  #plot the DAG graph
+  graphviz.plot(dag)
+  #learn the  parameters based on the graph and data
+  dag_fit <- bn.fit(dag, x)
+  #get grain class to causal inference
+  dag_gr <- as.grain(dag_fit)
+  dag_cp <- compile(dag_gr)
+  #function to calculate probability of causal node
+  dag_cal <- function(e){
+    dag_set <- setFinding(dag_cp, nodes = evide_node, states = e)
+    dag_que <- querygrain(dag_set, nodes = z)
+    return(dag_que[[1]])
+  }
+  #calculate all the prediction
+  all_cal <- lapply(evide, function(x) dag_cal(x))
+  #classify the result for the mostly class
+  pred <- unname(unlist(lapply(all_cal, function(x) names(x[which.max(x)]))))
+  return(pred)
+}
+#confusion matrix
+mypred_naive <- my_predict_naive(train_data, test_data, test_node, FALSE)
+truepred_naive <- my_predict_naive(train_data, test_data, test_node, TRUE)
+table(mypred_naive, test_data$S)
+table(truepred_naive, test_data$S)
+```
+
+### 5
+
+***Comment***
+
+Exercise 2 and 3 have the same results but they are different with exercise 4.
+for exercise 2, the probability of S given all their variables is shown below
+$$p(S|X \setminus S) = \frac{p(S, X)}{p(X \setminus S)} =\frac{\prod^{p}_{j=1}p(x_j|x(pa_j)}{\sum_{x_s}\prod^{p}_{j=1}p(x_j|x(pa_j)d_{x_s}}= p(S|pa_s)p(children(s)|S)p(children(s)|S \in pa_i)$$
+$p(S|pa_s)$ is the term of S parents, $p(children(s)|S)$ is the term of S children, $p(children(i)|S \in pa_i)$ is the term of the parents of S children minus S itself. They are the components of the Markov Blanket of S which is exercise 3. Hence, exercise 2 and exercise 3 have the same results.
+
+for exercise 4, naive bayes has the strong assumption that all the variables are pairwise independent. However, the variables in data set asia have many dependencies. Hence, naive bayes model could not fit the data set well and the result is not as well as exercise 2 and 3.
+
+
+
+
+
+
+
+
