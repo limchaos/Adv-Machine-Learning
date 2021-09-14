@@ -241,3 +241,7 @@ $$P(S|B,L,E,D,X,T,A) = \frac{P(S)P(B,L,E,D,X,T,A|S)}{\sum_SP(S)P(B,L,E,D,X,T,A|S
 in which variables cannot be further estimated. Then this returns a different result, also the accuracy is lower than previous Bayesian Network.
 
 
+## Apendix
+
+```{r, ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
+```
