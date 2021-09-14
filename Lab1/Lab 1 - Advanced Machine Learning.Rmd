@@ -31,7 +31,7 @@ For instance, the related results can be shown below. From the graphs, we can es
 
 
 
-**By different start way in each score**
+**By different starting way in each score**
 
 ```{r q1-p01}
 
@@ -62,7 +62,7 @@ res_model_1 = lapply(scores,function(scores)model_comp_1(scores,NN)   )
 ```
 
 
-Intuitively, by visualizing the results, for some score criterions,esp. aic,bdj,bde,bds..., the results for different initial values have some significant differences in the number of edges.
+Intuitively, by visualizing the results, for some score criterions, the results for different initial values have some significant differences in the number of edges.
 
 
 ```{r q1-2}
@@ -83,7 +83,7 @@ lapply(c(1:8), function(score_inx)res_plot(score_inx) )
 
 **Comparing by using the arc numbers**
 
-From the results below, all the results in each score criterion are not equivalent. 
+From the results below, we can see some of the results in each score criterion are not equivalent. 
 
 ```{r q1-3 }
 # compare(target, current, arcs = FALSE)
@@ -104,8 +104,6 @@ lapply(c(1:8), function(score_inx)all.equal(res_model_1[[score_inx]][[1]], res_m
 
 
 ```
-
-
 
 
 
@@ -159,7 +157,7 @@ train <- asia[id,]
 
 id1 <- setdiff(1:n, id)
 set.seed(1010)
-id2 <- sample(id1, floor(n*0.2))
+#id2 <- sample(id1, floor(n*0.2))
 test <- asia[id1,]
 
 ```
@@ -169,7 +167,7 @@ test <- asia[id1,]
 ```{r q2-1 }
 # Create structure
 structure <- hc(train)
-fit <- bn.fit(x = structure, data = train)  # training data
+fit <- bn.fit(x = structure, data = train)  # training data , structure learning
 fit_grain <- as.grain(fit)
 plot(structure)
 ```
@@ -196,7 +194,7 @@ nodes_2_S<-colnames(asia)[-2]
 compiled_obj = compiled_grain
 nodes_from = nodes_2_S  # nodes towards s
 node_to = "S"  # objective variable
-new_data = test[, -2]
+new_data = test[, -2]  # data
   
 # my prediction function
 my_pred<-function(compiled_obj,nodes_from, node_to,new_data){
@@ -205,8 +203,8 @@ my_pred<-function(compiled_obj,nodes_from, node_to,new_data){
 
   for (i in 1:nrow(new_data)){
     evidence <- setEvidence(object = compiled_obj,
-                            nodes = nodes_from,
-                            states = new_data[i,] )
+                            nodes = nodes_from,  # node names
+                            states = new_data[i,] )   # data
   
   posterior <- unlist(querygrain(object = evidence, nodes=node_to))
   
@@ -219,8 +217,6 @@ my_pred<-function(compiled_obj,nodes_from, node_to,new_data){
  
 return(predictions)  
 }
-
-
 
 res=my_pred(compiled_obj,nodes_from, node_to,new_data)
 confusion_matrix <- table(test2$S, res)
@@ -273,7 +269,6 @@ Hint: You may want to use the function mb from the bnlearn package
 ```{r q3 }
 
 markov_blanket <- mb(x = fit, node = "S")
-
 
 # parameters involved
 compiled_obj = compiled_grain  # markov obj
@@ -329,9 +324,6 @@ sum(confusion_matrix[c(1,4)])/sum(confusion_matrix)
 # Q5
 
 Explain why you obtain the same or different results in the exercises (2-4)
-
-
-[lacking the point of why the same ]
 
 
 Through using HC and markov blanket, it gets the same results in predictive rate with 0.721, which also equals that in true structure model. From it, at least it is reasonable to say that the two algorithms in the lab reach the expected effect.
