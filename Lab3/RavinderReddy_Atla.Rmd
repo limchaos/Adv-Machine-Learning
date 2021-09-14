@@ -1,0 +1,246 @@
+---
+title: 'Lab 1 : Graphical Models'
+author: "Ravinder Reddy Atla"
+date: "9/9/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r }
+if (!requireNamespace("BiocManager", quietly = TRUE)){
+  install.packages("BiocManager")
+}
+BiocManager::install("RBGL")
+BiocManager::install("Rgraphviz")
+BiocManager::install("gRain")
+```
+
+## 1. 
+
+```{r }
+library(bnlearn)
+data('asia')
+asia_data <- asia
+```
+
+
+
+```{r }
+hc_model_1 <- hc(asia_data, restart = 10, score = 'bic')
+print(hc_model_1)
+
+hc_model_1_score <- score(hc_model_1, data = asia_data)
+plot(hc_model_1)
+arc1 <- arcs(hc_model_1)
+cat('The hill climb algorithm score for 10 restarts using BDe or Bdeu')
+print(hc_model_1_score)
+```
+
+
+
+```{r }
+hc_model_2 <- hc(asia_data, restart = 10, score = 'bic')#, whitelist = arc1)
+print(hc_model_2)
+
+hc_model_2_score <- score(hc_model_2, data = asia_data)
+plot(hc_model_2)
+cat('The hill climb algorithm score for 10 restarts using BDe or Bdeu')
+print(hc_model_2_score)
+arcs(hc_model_2)
+all.equal(hc_model_1, hc_model_2)
+```
+
+
+
+```{r }
+hc_model_3 <- hc(asia_data, restart = 100, score = 'bde')
+print(hc_model_3)
+
+hc_model_3_score <- score(hc_model_3, data = asia_data)
+plot(hc_model_3)
+cat('The hill climb algorithm score for 0 restarts using BDe or Bdeu')
+print(hc_model_3_score)
+
+```
+
+## 2. 
+
+```{r }
+set.seed(12345)
+n <- dim(asia_data)[1]
+id_train <- sample(1:n, floor(n*0.8))
+train_data <- asia_data[id_train,]
+test_data <- asia_data[-id_train,]
+```
+
+
+```{r }
+library(gRain)
+```
+
+
+
+```{r }
+params <- bn.fit(hc(train_data), train_data)
+params_grain <- as.grain(params)
+param_grain_tree <- compile(params_grain)
+print(param_grain_tree)
+```
+
+```{r }
+plot(hc(train_data, score = 'bde'))
+```
+
+
+```{r }
+# Predicting the fitted network on test data 
+bn_nodes <- c('A', 'T', 'L', 'B', 'E', 'X', 'D')
+pred_list <- c()
+for (i in 1:nrow(test_data)){
+  bn_states <- (as.matrix(test_data[i,-2]))
+  #print(bn_states)
+  potentials <- setEvidence(param_grain_tree, bn_nodes, bn_states)
+  smoking_query <- querygrain(potentials, c('S'))
+  #print(smoking_query$S)
+  if (smoking_query$S[1] > smoking_query$S[2]){
+    pred_list <- c(pred_list, 'no')
+  }
+  else{
+    pred_list <- c(pred_list, 'yes')
+  }
+}
+```
+
+```{r}
+library(caret)
+confusionMatrix(as.factor(pred_list),as.factor(test_data$S))
+```
+
+
+```{r }
+dag = model2network("[A][S][T|A][L|S][B|S][D|B:E][E|T:L][X|E]")
+params_true <- bn.fit(dag, train_data)
+params_grain_true <- as.grain(params_true)
+param_grain_true_tree <- compile(params_grain_true)
+
+```
+
+```{r}
+plot(dag)
+
+```
+
+
+```{r }
+bn_nodes <- c('A', 'T', 'L', 'B', 'E', 'X', 'D')
+pred_list_true <- c()
+for (i in 1:nrow(test_data)){
+  bn_states <- (as.matrix(test_data[i,-2]))
+  potentials <- setEvidence(param_grain_true_tree, bn_nodes, bn_states)
+  smoking_query <- querygrain(potentials, c('S'))
+  
+  if (smoking_query$S[1] > smoking_query$S[2]){
+    pred_list_true <- c(pred_list_true, 'no')
+  }
+  else{
+    pred_list_true <- c(pred_list_true, 'yes')
+  }
+}
+```
+
+
+```{r }
+confusionMatrix(as.factor(pred_list_true),as.factor(test_data$S))
+```
+
+## 3.
+
+```{r }
+train_params_mb <- bn.fit(hc(train_data, score = 'bde'), train_data)
+markov_blanket <- mb(train_params_mb, 'S')
+markov_blanket
+```
+
+
+```{r}
+# Nodes are the ones in the Markov blanket of the variable 'S'
+pred_list_mb <- c()
+for (i in 1:nrow(test_data)){
+  bn_states <- (as.matrix(test_data[i,c(4,5)]))
+  #print(bn_states)
+  potentials <- setEvidence(param_grain_true_tree, markov_blanket, bn_states)
+  smoking_query <- querygrain(potentials, c('S'))
+  
+  if (smoking_query$S[1] > smoking_query$S[2]){
+    pred_list_mb <- c(pred_list_mb, 'no')
+  }
+  else{
+    pred_list_mb <- c(pred_list_mb, 'yes')
+  }
+}
+```
+
+```{r}
+confusionMatrix(as.factor(pred_list_mb),as.factor(test_data$S))
+```
+
+## 4.
+
+```{r}
+# In Naive Bayes classifier all the observed variables are assumed to independent of each other when conditioned on a variable. Hence, we draw an edge for each variable from the variable it is conditioned on.
+e <- empty.graph(colnames(train_data))
+nb_dag <- matrix(c('S','A','S','T','S','L','S','B','S','E','S','X','S','D'),
+                 ncol = 2, byrow = TRUE, dimnames = list(NULL, c('From', 'To')))
+
+arcs(e) = nb_dag
+plot(e)
+```
+
+```{r}
+params_nb <- bn.fit(e, train_data)
+params_grain_nb <- as.grain(params_nb)
+param_grain_tree_nb <- compile(params_grain_nb)
+print(param_grain_tree_nb)
+```
+
+```{r}
+bn_nodes <- c('A', 'T', 'L', 'B', 'E', 'X', 'D')
+pred_list_nb <- c()
+for (i in 1:nrow(test_data)){
+  bn_states <- (as.matrix(test_data[i,-2]))
+  potentials <- setEvidence(param_grain_tree_nb, bn_nodes, bn_states)
+  smoking_query <- querygrain(potentials, c('S'))
+  
+  if (smoking_query$S[1] > smoking_query$S[2]){
+    pred_list_nb <- c(pred_list_nb, 'no')
+  }
+  else{
+    pred_list_nb <- c(pred_list_nb, 'yes')
+  }
+}
+```
+
+```{r}
+confusionMatrix(as.factor(pred_list_nb),as.factor(test_data$S))
+
+```
+
+```{r}
+
+
+```
+
+```{r}
+
+
+```
+
+
+
+
+
+
