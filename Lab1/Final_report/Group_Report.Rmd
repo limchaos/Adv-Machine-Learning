@@ -224,6 +224,8 @@ sum(confusion_matrix[c(1,4)])/sum(confusion_matrix)
 
 ## Q1.5
 
+![bn learned](bn.png){#id .class width=50% height=50%} ![bn original](bn1.png){#id .class width=50% height=50%}
+
 We got the same results for Q1.2 Generated Graph and Q1.3 Markov Blanket, but different results for Q1.4 Naive Bayes. The explaination as follow:
 
 First we consider the conditional distribution of S in This Asia Network:
