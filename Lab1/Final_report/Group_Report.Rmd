@@ -230,7 +230,7 @@ First we consider the conditional distribution of S in This Asia Network:
 
 
 $$P(S|B,L,E,D,X,T,A) = \frac{P(S)P(B|S)P(L|S)P(E,D,X,T,A|B,L,\textcolor{red}{S})}{\sum_SP(S)P(B|S)P(L|S)P(E,D,X,T,A|B,L)}$$
-$$~~~~~~~~~~~~~~~~~~~~~~~~=\frac{P(S)P(B|S)P(L|S)}{\sum_SP(S)P(B|S)P(L|S)}=\frac{P(S,B,L)}{P(B,L)}=P(S|B,L)$$
+$$~~~~~~~~~~~~~~~~~~~~~~~~\approx\frac{P(S)P(B|S)P(L|S)}{\sum_SP(S)P(B|S)P(L|S)}=\frac{P(S,B,L)}{P(B,L)}=P(S|B,L)$$
 
 Note $P(S|B,L)$ is Markov blanket of $S$. Regardless the structure of $P(E,D,X,T,A|B,L)$, the partial structure $L\longleftarrow S \longrightarrow B$ is the same in Q1.2 and Q1.3. Above formula hold for all 3 situations, the confusion matrix thus should be the same.
 
