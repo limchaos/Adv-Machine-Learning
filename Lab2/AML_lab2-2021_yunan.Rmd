@@ -1,0 +1,210 @@
+---
+title: "lab2"
+author: "yunan Dong"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list=ls())
+library(HMM)
+library(entropy)
+library(magrittr)
+```
+
+
+
+## Q(1) Build a hidden Markov model (HMM) for the scenario described above
+
+```{r q1}
+n=10
+# real states: 1,2,...,n
+obs=paste0("Obs_",c(1:n))
+m = 2  # [i-2,i+2] ,m=1,2
+
+# transition probability matrix, actual state transition
+A <- matrix(0, nrow = n, ncol = n)
+# possible locations the device reports with different states, i.e. the observations/states shown by the device
+B <- matrix(0, nrow = n, ncol = n)
+
+
+f <- function(i){ifelse(i%%10==0,10,i%%10)}  # dealing with the ring, index identified by mod/remainder 
+# initializing the two matrices, maybe I should write a function instead of the ugly 2-fold-loop
+for (i in 1:n) {
+  A[i,i] <- 0.5
+  A[i,f(i+1)] <- 0.5
+  B[i,f(i)] <- 0.2
+  for (j in 1:m){
+    B[i,f(i-j)] <- 0.2
+    B[i,f(i+j)] <- 0.2
+  }
+    
+}  
+ 
+# calling the "ancient" package, it seems not being updated from 2010, hard to say, never mind, just for demonstration,be calm!!!
+hmm <- initHMM(States = c(1:n), Symbols = obs, 
+               transProbs = A,
+               emissionProbs = B)
+
+hmm
+```
+
+
+## (2) Simulate the HMM for 100 time steps
+```{r q2}
+#set.seed(20210981)
+n_sim = 100
+res_sim <- simHMM(hmm, n_sim) # ?simHMM ,imHMM(hmm, length)
+res_sim
+
+# states	The path of states.
+# observations	The sequence of observations.
+
+```
+## Q3
+
+Discard the hidden states from the sample obtained above. **Use the remaining observations to compute the filtered and smoothed probability distributions for each of the 100 time points. Compute also the most probable path.**
+
+```{r q3}
+
+# inferences: forward, backward, viterbi, observation->real state with probability
+
+fp <- forward(hmm, res_sim$observation)%>%exp()
+bp <- backward(hmm, res_sim$observation)%>%exp()
+
+filtering <- prop.table(fp,2)      #  filter,posteriror,// by col, p(states, index)/p(states),
+smoothing <- prop.table(fp*bp,2) #   #also, can use posterior(hmm, observation) instead, see ?posterior:posterior(hmm, res_sim$observation)
+# see https://r-lang.com/prop-table-in-r/
+
+
+# most probable path, the so-called
+viterbi_path <- viterbi(hmm, res_sim$observation)
+#most_probable_path
+
+
+```
+
+
+# Q(4) 
+
+Compute the accuracy of the filtered and smoothed probability distributions, and of the most probable path. That is, compute the percentage of the true hidden states that are guessed by each method
+
+```{r q4}
+
+# which state has the largest probability in each time-step
+filtered_state = apply(filtering, 2, which.max) %>% as.vector()   
+smoothed_state = apply(smoothing, 2, which.max) %>% as.vector() 
+
+
+# to compare with simulation results
+cmp1=(res_sim$states==filtered_state)%>%table()
+print(paste("accuracy of filter:",cmp1[2]/n_sim) )
+
+cmp2=(res_sim$states==smoothed_state)%>%table()
+print(paste("accuracy of smoother:",cmp2[2]/n_sim) ) 
+
+cmp3=(res_sim$states==viterbi_path)%>%table()
+print(paste("accuracy of viterbi:",cmp3[2]/n_sim) ) 
+```
+
+## Q(5) 
+
+Repeat the previous exercise with different simulated samples. In general, the smoothed distributions should be more accurate than the filtered distributions. Why ? In general,the smoothed distributions should be more accurate than the most probable paths, too.Why ?
+
+By definition and from the way to get filtering and smoothing in the coding part below, we can see:
+Smoothed distribution is based on  the whole data 1:T and two sequential dependence relations(forward and backward),i.e.,t|t-1 and t|t+1,And filtered distribution is on data 1:t and with one dependence relations(forward) as t|t-1, thus, the former makes use more useful information than the latter does.
+
+As to viterbi,...
+
+```{r q5}
+
+accuracy_cmp<-function(i){
+  
+  res_sim <- simHMM(hmm, n_sim)
+ #------------------------------------------------------------------------
+  
+  fp <- forward(hmm, res_sim$observation)%>%exp()
+  bp <- backward(hmm, res_sim$observation)%>%exp()
+  filtering <- prop.table(fp,margin=2)      
+  smoothing <- prop.table(fp*bp,margin=2) 
+ #------------------------------------------------------------------------
+   
+  filtered_state = apply(filtering, 2, which.max) %>% as.vector()   
+  smoothed_state = apply(smoothing, 2, which.max) %>% as.vector()  
+  viterbi_path <- viterbi(hmm, res_sim$observation)
+ #------------------------------------------------------------------------ 
+  cmp1=(res_sim$states==filtered_state)%>%table()
+  cmp2=(res_sim$states==smoothed_state)%>%table()
+  cmp3=(res_sim$states==viterbi_path)%>%table()
+ 
+  # return
+  c(cmp1[2]/n_sim,cmp2[2]/n_sim,cmp3[2]/n_sim )%>%as.vector()
+  # 1 filter, 2 smoother, 3 viterbi
+}
+
+#--------------------------------------------------------------------------
+
+n_sampling=200
+res=lapply(c(1:n_sampling), accuracy_cmp)
+
+# The accuracy from left to right:filter, smoother, viterbi
+res1<-res%>%unlist()%>%matrix(nrow=n_sampling,byrow=TRUE)
+
+res1%>%apply(MARGIN = 2,FUN=mean)
+
+#colnames(res1)<-c("filter","smoother","viterbi")
+plot(res1[,1],type="l",col="red",ylim=c(0.2,0.9),xlab="times",ylab="probability")
+lines(res1[,2],col="green")
+lines(res1[,3],col="blue")
+legend(x = 80, y =0.4,
+       legend = c("filter","smoother","viterbi")
+       ,  col = c("red","green","blue")
+       , lty = c(1,1), lwd = c(2,2), cex = 0.8
+       )
+
+```
+
+## Q(6) 
+
+Is it always true that the later in time (i.e., the more observations you have received) the better you know where the robot is ?
+
+By definition, entropy is used to measure uncertainty degree, and big entropy means big uncertainty
+The entropy does not significantly go down with increasing time steps in the simulation, this indicates the more observations in more time steps do not supply more useful information to improve the accuracy of filter 
+
+```{r q6}
+
+par(mfrow=c(2,1))
+lapply(c(1:n_sim),function(i)entropy.empirical(filtering[,i])  )%>%unlist()%>%plot(type="l",main="filter")
+lapply(c(1:n_sim),function(i)entropy.empirical(smoothing[,i])  )%>%unlist()%>%plot(type="l",main="smoother")
+#lapply(c(1:n_sim),function(i)entropy.empirical(viterbi_path[,i])  )%>%unlist()%>%plot(type="l")
+```
+
+
+## Q(7)
+
+Consider any of the samples above of length 100. Compute the probabilities of the hidden states for the time step 101.
+```{r q7}
+
+s100= smoothing[,100]%>%matrix()
+transProbmx<-hmm$transProbs
+
+transProbmx%*%s100
+
+```
+
+
+
+
+
+
+
+# Appendix
+
+```{r ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
+
+
+
+
+
+```
