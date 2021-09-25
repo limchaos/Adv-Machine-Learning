@@ -1,0 +1,169 @@
+---
+title: "Hidden Markov Models Lab"
+author: "Ravinder Reddy Atla"
+date: "9/25/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+ 
+
+```{r}
+library(HMM)
+library(entropy)
+```
+
+## 1. Build HMM Model
+
+```{r}
+states_rob <- seq(1,10,1)
+symbols_rob <- seq(1,10,1)
+startprobs_rob <- rep(0.1,10)
+
+# Equal transition probability for moving from current state to next state (0.5)
+transprobs_rob <- matrix(0, 10, 10)
+diag(transprobs_rob) <- 0.5
+diag(transprobs_rob[,-1]) <- 0.5
+transprobs_rob[10,1] <- 0.5
+
+emissionprobs_rob <- c(0.2, 0.2, 0.2, 0, 0, 0, 0, 0, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0, 0, 0, 0, 0, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0, 0, 0, 0, 0, 0, 0.2, 0.2, 0.2, 0.2, 0.2, 0, 0, 0, 0, 0, 0, 0.2, 0.2, 0.2, 0.2, 0.2, 0, 0, 0, 0, 0, 0, 0.2, 0.2, 0.2, 0.2, 0.2, 0, 0, 0, 0, 0, 0, 0.2, 0.2, 0.2, 0.2, 0.2, 0, 0, 0, 0, 0, 0, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0, 0, 0, 0, 0, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0, 0, 0, 0, 0, 0.2, 0.2, 0.2)
+
+emissionprobs_rob <- matrix(emissionprobs_rob, 10, 10)
+```
+
+```{r}
+hmm_model <- initHMM(states_rob, symbols_rob, startprobs_rob, transprobs_rob,
+                     emissionprobs_rob)
+```
+
+## 2. Simulate HMM model for 100 time steps
+
+```{r}
+samples <- simHMM(hmm_model, 100)
+print(samples)
+```
+
+# 3.
+
+```{r}
+filter_prob <- forward(hmm_model, samples$observation)
+smoothed_prob <- posterior(hmm_model, samples$observation)
+probable_path <- viterbi(hmm_model, samples$observation)
+#print(filter_prob)
+#print(smoothed_prob)
+print(probable_path)
+```
+
+
+# 4.
+
+```{r}
+# Filtered Distribution
+filter_prob_logfree <- exp(filter_prob)
+filter_prob_norm <- prop.table(filter_prob_logfree, margin = 2)
+filter_prob_most_prob <- apply(filter_prob_norm,MARGIN = 2, FUN = which.max)
+filter_accuracy <- sum(filter_prob_most_prob == samples$states)/ length(samples$states)
+print(filter_accuracy)
+```
+
+```{r}
+# Smoothed Distribution
+smoothed_prob_norm <- prop.table(smoothed_prob)
+smoothed_most_prob <- apply(smoothed_prob_norm, MARGIN = 2, FUN = which.max)
+smoothed_accuracy <- sum(smoothed_most_prob == samples$states)/ length(samples$states)
+print(smoothed_accuracy)
+```
+
+```{r}
+# Most Probable path
+most_prob_path_accuracy <- sum(probable_path == samples$states)/ length(samples$states)
+print(most_prob_path_accuracy)
+```
+
+# 5.
+
+```{r}
+accuracy_FSMP <-function(hmm, states, observations){
+  samples <- list('states' = states, 'observation' = observations)
+  filter_prob <- forward(hmm_model, samples$observation)
+  smoothed_prob <- posterior(hmm_model, samples$observation)
+  probable_path <- viterbi(hmm_model, samples$observation)
+  
+  # Filtered Distribution
+  filter_prob_logfree <- exp(filter_prob)
+  filter_prob_norm <- prop.table(filter_prob_logfree)
+  filter_prob_most_prob <- apply(filter_prob_norm,MARGIN = 2, FUN = which.max)
+  filter_accuracy <- sum(filter_prob_most_prob == samples$states)/ length(samples$states)
+  
+  # Smoothed Distribution
+  smoothed_prob_norm <- prop.table(smoothed_prob)
+  smoothed_most_prob <- apply(smoothed_prob_norm, MARGIN = 2, FUN = which.max)
+  smoothed_accuracy <- sum(smoothed_most_prob == samples$states)/ length(samples$states)
+  
+  # Most Probable path
+  most_prob_path_accuracy <- sum(probable_path == samples$states)/ length(samples$states)
+  
+  return(list('filter' = filter_accuracy, 'smooth' = smoothed_accuracy, 
+              'most_prob' = most_prob_path_accuracy))
+}
+```
+
+
+
+```{r}
+set.seed(123)
+samples_1 <- simHMM(hmm_model, 100)
+acc_1 <- accuracy_FSMP(hmm_model, samples_1$states, samples_1$observation)
+print(acc_1)
+```
+
+
+
+```{r}
+set.seed(12345)
+samples_2 <- simHMM(hmm_model, 100)
+acc_2 <- accuracy_FSMP(hmm_model, samples_2$states, samples_2$observation)
+print(acc_2)
+```
+
+
+```{r}
+set.seed(1234)
+samples_3 <- simHMM(hmm_model, 100)
+acc_3 <- accuracy_FSMP(hmm_model, samples_3$states, samples_3$observation)
+print(acc_3)
+```
+
+
+```{r}
+set.seed(123456)
+samples_4 <- simHMM(hmm_model, 100)
+acc_4 <- accuracy_FSMP(hmm_model, samples_4$states, samples_4$observation)
+print(acc_4)
+```
+
+## 6.
+
+```{r}
+entropy_rob <- apply(filter_prob_norm, MARGIN = 2, FUN = entropy.empirical)
+entropy_smooth <- apply(smoothed_prob_norm, MARGIN = 2, FUN = entropy.empirical)
+entropy_rob_1 <- apply(filter_prob_norm[,0:50], MARGIN = 2, FUN = entropy.empirical)
+plot(entropy_rob,type = 'l')
+lines(entropy_smooth, col = 'red')
+```
+
+## 7.
+
+```{r}
+print(filter_prob_norm[,100] %*% transprobs_rob)
+print(filter_prob_norm[,100])
+
+```
+
+
+
+
+
