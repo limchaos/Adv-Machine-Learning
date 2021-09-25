@@ -1,0 +1,205 @@
+---
+title: "Lab2"
+author: "Yifan Ding, Chao Fu, Yunan Dong, Ravinder Reddy"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(HMM)
+library(entropy)
+```
+
+## Q1.1
+
+```{r}
+Trans <- matrix(0, nrow = 10, ncol = 10)
+Emiss <- matrix(0, nrow = 10, ncol = 10)
+
+re_index <- function(i){
+  i <- i %% 10
+  if (i %% 10 == 0) {
+    i = 10
+  }
+  return(i)
+}
+
+for (i in 1:10) {
+  
+  Trans[i, i] = 0.5
+  Trans[i, re_index(i+1)] = 0.5
+  
+  Emiss[i, i] <- 0.2
+  Emiss[i, re_index(i+1)] <- 0.2
+  Emiss[i, re_index(i-1)] <- 0.2
+  Emiss[i, re_index(i+2)] <- 0.2
+  Emiss[i, re_index(i-2)] <- 0.2
+}
+
+
+model <- initHMM(States = c(1:10), Symbols = c(1:10), 
+               transProbs = Trans,
+               emissionProbs = Emiss)
+model
+```
+
+
+
+## Q1.2
+
+```{r}
+set.seed(1234)
+samples <- simHMM(model, 100)
+samples
+plot(samples$states, type='l', col='red', xlab = 'Time', ylab = 'path')
+lines(samples$observation, col='green')
+legend("topright", legend = c("States", "Observation"),
+         fill = c("red", "green"), cex = 0.8)
+```
+
+## Q1.3
+
+```{r}
+fw <- exp(forward(model, samples$observation))
+bw <- exp(backward(model, samples$observation))
+
+filtering <- prop.table(fw, 2) 
+smoothing <- prop.table(fw*bw, 2) 
+```
+
+## Q1.4
+
+```{r}
+filter_postion = apply(filtering, 2, which.max)
+smooth_postion = apply(smoothing, 2, which.max)
+viterbi_position<- viterbi(model, samples$observation)
+
+acc_filter <- sum(filter_postion == samples$states) / 100
+print(paste("Accuracy of filter:",acc_filter) )
+acc_smooth <- sum(smooth_postion == samples$states) / 100
+print(paste("Accuracy of smooth:",acc_smooth) )
+acc_viterbi <- sum(viterbi_position == samples$states) / 100
+print(paste("Accuracy of viterbi:",acc_viterbi) )
+
+plot(filter_postion, type='l', col='red', xlab = 'Time', ylab = 'path')
+lines(samples$states, col='blue')
+lines(samples$observation, col='yellow')
+legend("topright", legend = c("Fitering", "States", "Observation"),
+         fill = c("red", "blue", "yellow"), cex = 0.8)
+
+
+plot(smooth_postion, type='l', col='red', xlab = 'Time', ylab = 'path')
+lines(samples$states, col='blue')
+lines(samples$observation, col='yellow')
+legend("topright", legend = c("Smoothing", "States", "Observation"),
+         fill = c("red", "blue", "yellow"), cex = 0.8)
+
+plot(viterbi_position, type='l', col='red')
+lines(samples$states, col='blue')
+lines(samples$observation, col='yellow')
+legend("topright", legend = c("Viterbi", "States", "Observation"),
+         fill = c("red", "blue", "yellow"), cex = 0.8)
+
+
+```
+
+## Q1.5
+
+```{r}
+set.seed(1234)
+repeat_size <- 100
+acc_filters <- c()
+acc_smooths <- c()
+acc_viterbis <- c()
+
+for (i in 1:repeat_size) {
+  
+  sample_size <- 100
+  samples <- simHMM(model, sample_size)
+  fw <- exp(forward(model, samples$observation))
+  bw <- exp(backward(model, samples$observation))
+  
+  filtering <- prop.table(fw, 2) 
+  smoothing <- prop.table(fw*bw, 2) 
+  
+  filter_postion = apply(filtering, 2, which.max)
+  smooth_postion = apply(smoothing, 2, which.max)
+  viterbi_position<- viterbi(model, samples$observation)
+  
+  acc_filter <- sum(filter_postion == samples$states) / sample_size
+  acc_smooth <- sum(smooth_postion == samples$states) / sample_size
+  acc_viterbi <- sum(viterbi_position == samples$states) / sample_size
+  
+  acc_filters <- c(acc_filters, acc_filter)
+  acc_smooths <- c(acc_smooths, acc_smooth)
+  acc_viterbis <- c(acc_viterbis, acc_viterbi)
+}
+
+avg_acc_filter <- mean(acc_filters)
+print(paste("Average accuracy of filtering:",avg_acc_filter) )
+avg_acc_smooth <- mean(acc_smooths)
+print(paste("Average accuracy of smoothing:",avg_acc_smooth) )
+avg_acc_viterbi <- mean(acc_viterbis)
+print(paste("Average accuracy of viterbi:",avg_acc_viterbi) )
+
+```
+
+**In general, the smoothed
+distributions should be more accurate than the filtered distributions. Why ? In general,
+the smoothed distributions should be more accurate than the most probable paths, too.
+Why ?**
+
+The filtered distribution is given below:
+
+$$p(z^{t}|x^{0:t})$$
+
+The smoothing distribution is given below:
+
+$$p(z^{t}|x^{0:T})$$
+The most probable path:
+
+$$Z_{max}^{0:T} = argmax_{z^{0:T}}P(Z^{0:T}|X^{0:T})$$
+
+Answer: Smoothed distribution is conditioning on all observations, while filtered distribution is only conditioning on up-to-date observations. Later observations should not effect previous state only if we know the exact physics model and correct observations, but here HMM is probabilistic estimation(we dont have exact physics model as well as correct observations). Therefore HMM is doing probabilistic estimation by Bayes theorem, but we believe state at time t+1, t+2...t+n are dependent on state at time t, therefore the posterior on more observations can be helpful in smoothing. For most probable path, this approach try to maximize joint probability of hidden state $P(Z^{0:T}|X^{0:T}$, which can not guarantee the best solution of each hidden state $P(z^t|X^{0:T})$.
+
+## Q1.6
+```{r}
+entropy_filter <- lapply(c(1:100),function(i)entropy.empirical(filtering[,i]))
+entropy_smooth <- lapply(c(1:100),function(i)entropy.empirical(smoothing[,i]))
+plot(unlist(entropy_filter), type='l', col='red', xlab = 'Time', ylab = 'Entropy')
+lines(unlist(entropy_smooth), col='green')
+legend("topright", legend = c("Fitering", "smotthing"),
+         fill = c("red", "green"), cex = 0.8)
+```
+
+```{r}
+Hs <- c()
+for (i in 1:90) {
+  joint_smoothing <- posterior(model, samples$observation[1:10+i])
+  H <- entropy.empirical(joint_smoothing[ ,10])
+  Hs <- c(Hs, H)
+}
+plot(c(11:100), Hs, type = 'l', xlab = 'Number of Observations', ylab = 'Entropy at time 10')
+
+```
+
+$$H(x) = -\sum_{n=i}^{N}p_i(x)logp_i(x)$$
+According to Information theory, higher entropy indicate higher uncertainty, (i.e. an event happens with probability 1, means no uncertainty, entropy is 0), so the lower entropy the more confidence. Clearly, smoothing has lower entropy comparing filtering in most time point. But we also checked the trend of Entropy for a single time point at 10 with an increasing number of observations, we find the trend is quite flat, seems indicate entropy(uncertainty) doesn't decrease with more observations.
+
+
+```{r}
+Z_100= as.matrix(filtering[,100])
+Z_100
+Z_101 <- t(model$transProbs)%*%Z_100
+
+print(paste("State 101 most likely be", which.max(Z_101)))
+```
+
+# Appendix
+
+```{r ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
+
+```
