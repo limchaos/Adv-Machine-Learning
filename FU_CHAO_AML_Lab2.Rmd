@@ -1,0 +1,260 @@
+---
+title: "AML_Lab2"
+author: "CHAO FU"
+date: "9/16/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE, echo=FALSE, message=FALSE, error=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(HMM)
+library(entropy)
+```
+
+### 1
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#set stats and symbols alphabet
+unob <- LETTERS[1:10]
+ob <- LETTERS[1:10]
+#set start probability
+startprob <- rep(0.1, 10)
+#set transition probability
+prob1 <- matrix(0, 10, 10)
+for (i in 1:10){
+  if (i <= 9){
+    prob1[i, c(i, i + 1)] <- c(0.5, 0.5)
+  }else {prob1[i, c(i, i - 9)] <- c(0.5, 0.5)}
+}
+#set emission probability
+prob2 <- matrix(0, 10, 10)
+for (i in 3:8){
+  prob2[i, (i - 2) : (i + 2)] <- rep(0.2, 5)
+}
+c1 <- rep(c(0.2, 0, 0.2), c(3, 5, 2))
+c2 <- rep(c(0.2, 0, 0.2), c(4, 5, 1))
+prob2[1, ] <- c1
+prob2[2, ] <- c2
+prob2[9, ] <- rev(c2)
+prob2[10, ] <- rev(c1)
+#set initial HMM
+my_hmm <- initHMM(States = unob, Symbols = ob, startProbs = startprob,
+                  transProbs = prob1, emissionProbs = prob2)
+#present initial HMM
+print("The information of HMM model is:")
+cat("\n")
+my_hmm
+```
+
+### 2
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#set random seed
+set.seed(4)
+#simulate HMM for 100 time steps
+simu_hmm <- simHMM(my_hmm, 100)
+#present path for states and symbols
+print("The result of simulated HMM model is:")
+cat("\n")
+simu_hmm
+```
+
+### 3
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#extract observation sample
+my_ob_sample <- simu_hmm$observation
+#calculate filter probability (alpha)
+my_forward <- forward(my_hmm, my_ob_sample)
+my_filter <- prop.table(exp(my_forward), 2)
+#present first 10 filter probability 
+print("The partial filter probability is:")
+cat("\n")
+print(my_filter[, 1:10])
+cat("\n")
+#calculate backward probability (beta)
+my_backward <- backward(my_hmm, my_ob_sample)
+#calculate forward-backward probability (alpha * beta)
+my_for_back <- exp(my_forward) * exp(my_backward)
+#calculate smooth probability
+my_smooth <- prop.table(my_for_back, 2)
+#present first 10 smooth probability
+print("The partial smooth probability is:")
+cat("\n")
+print(my_smooth[, 1:10])
+cat("\n")
+#use posterior function to calculate smooth
+#posterior(my_hmm, my_ob_sample)
+#calculate probable path of states by viterbi algorithm
+my_path <- viterbi(my_hmm, my_ob_sample)
+#present probable path of states
+print("The probable path is:")
+cat("\n")
+print(my_path)
+```
+
+### 4
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#extract states sample
+my_unob_sample <- simu_hmm$states
+#set function to extract most probability states
+my_most_states <- function(my_post, marginal){
+  return(unname(apply(my_post, marginal, function(x) names(which.max(x)))))
+}
+#calculate filter and smooth most probability states
+my_filter_post <- my_most_states(my_filter, 2)
+my_smooth_post <- my_most_states(my_smooth, 2)
+#set function to calculate accuracy between true hidden states and posterior
+my_accuracy <- function(state1, state2){
+  my_table <- table(state1, state2)
+  accu <- sum(diag(my_table))/ sum(my_table)
+  return(accu)
+}
+#calculate filter accuracy
+print("The filter accuracy is:")
+cat("\n")
+print(my_accuracy(my_unob_sample, my_filter_post))
+cat("\n")
+#calculate smooth accuracy
+print("The smooth accuracy is:")
+cat("\n")
+print(my_accuracy(my_unob_sample, my_smooth_post))
+cat("\n")
+#calculate most probable path
+print("The probable path accuracy is:")
+cat("\n")
+print(my_accuracy(my_unob_sample, my_path))
+```
+
+### 5
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#set random seed
+set.seed(4)
+#set function to calculate accuracy with different simulated samples
+multi_accuray <- function(iter, size){
+  #generate samples
+  sample_all <- lapply(seq_len(iter), function(x) simHMM(my_hmm, size))
+  sample_list <- lapply(sample_all, function(x) list("sta" = x$states, "obs" = x$observation))
+  #calculate most probability states in filter
+  sample_filter <- lapply(sample_list, function(x) my_most_states(prop.table(exp(forward(my_hmm, x$obs)), 2), 2))
+  #calculate most probability states in smooth
+  sample_smooth <- lapply(sample_list, function(x) my_most_states(posterior(my_hmm, x$obs), 2))
+  #calculate most probable path
+  sample_path <- lapply(sample_list, function(x) viterbi(my_hmm, x$obs))
+  #calculate filter accuracy
+  accuracy_filter <- mapply(function(x, y) my_accuracy(x$sta, y), sample_list, sample_filter)
+  #calculate smooth accuracy
+  accuracy_smooth <- mapply(function(x, y) my_accuracy(x$sta, y), sample_list, sample_smooth)
+  #calculate path accuracy
+  accuracy_path <- mapply(function(x, y) my_accuracy(x$sta, y), sample_list, sample_path)
+  #output
+  return(data.frame("filter" = accuracy_filter, "smooth" = accuracy_smooth, "path" = accuracy_path))
+}
+#calculate accuracy with different size of simulated HMM
+mul100 <- multi_accuray(iter = 50, size = 100)
+mul200 <- multi_accuray(iter = 50, size = 200)
+mul300 <- multi_accuray(iter = 50, size = 300)
+#set plot function
+my_plot <- function(n, d){
+  plot(x = seq_len(n), y = d$filter, type = "l", col = "red",
+       xlab = "Number", ylab = "Accuracy", ylim = c(0.3, 0.9))
+  lines(x = seq_len(n), y = d$smooth, type = "l", col = "blue")
+  lines(x = seq_len(n), y = d$path, type = "l", col = "green")
+  legend("topright", legend = c("filter", "smooth", "path"),
+         fill = c("red", "blue","green"), cex = 0.8)
+}
+#set plot function
+my_plot1 <- function(n, d1, d2, d3){
+  plot(x = seq_len(n), y = d1, type = "l", col = "red",
+       xlab = "Number", ylab = "Accuracy", main = "Comparison accuracy",
+       ylim = c(0.3, 0.9))
+  lines(x = seq_len(n), y = d2, type = "l", col = "blue")
+  lines(x = seq_len(n), y = d3, type = "l", col = "green")
+  legend("topright", legend = c("100 samples", "200 samples", "300 samples"),
+         fill = c("red", "blue","green"), cex = 0.8)
+}
+print("The comprasion accuracy with 50 times and 100 samples")
+my_plot(50, mul100)
+cat("\n")
+print("The comprasion accuracy with 50 times and 200 samples")
+my_plot(50, mul200)
+cat("\n")
+print("The comprasion accuracy with 50 times and 300 samples")
+my_plot(50, mul300)
+cat("\n")
+print("The comprasion filter accuracy with different sample size")
+my_plot1(50, mul100$filter, mul200$filter, mul300$filter)
+cat("\n")
+print("The comprasion smooth accuracy with different sample size")
+my_plot1(50, mul100$smooth, mul200$smooth, mul300$smooth)
+cat("\n")
+print("The comprasion path accuracy with different sample size")
+my_plot1(50, mul100$path, mul200$path, mul300$path)
+```
+
+***Comment***
+
+1)
+
+The filtered distribution notation is given below:
+$$p(z^{t}|x^{0:t})$$
+
+Filtering is the posterior probability of hidden states given by observations in different time steps. More observations can get greater estimation of posterior probability. However, the number of observations which the hidden states can use is increasing with time steps. The hidden states in the former time steps can use fewer observations than the latter ones. Hence, the latter time steps can have better estimations of posterior probability than the former ones.
+
+The smoothing distribution notation is given below:
+$$p(z^{t}|x^{0:T})$$
+Smoothing is also the posterior probability of hidden states given by observations. The difference is that smoothing use all the observations to calculate posterior probability in each time step. Hence, smoothing have better estimations and accuracy than filtering.
+
+2)
+
+The posterior probability of hidden states given by observations can be used to find the most probable path from the first time step to the end. The Viterbi algorithm(partial formula) is given below:
+$$ w(z^{t+1}):=logp(x^{t+1}|z^{t+1}) + max_{z^t}[logp(z^{t+1}|z^t)+w(t)(t = 0, 1, \dots,T-1)$$
+
+It can be seen that the most probable hidden state in each time step is selected by previous observations not all. Hence, the accuracy of this method is lower than smoothing. 
+
+### 6
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+set.seed(4)
+entro_sample <- simHMM(my_hmm, 300)$observation
+entro_forward <- lapply(seq(50, 300, 10), function(x) forward(my_hmm, entro_sample[1:x]))
+entro_filter <- lapply(entro_forward, function(x) prop.table(exp(x), 2))
+entro_result <- mapply(function(x, y) entropy.empirical(x[, y]), entro_filter, seq(50, 300, 10))
+plot(x = seq(50, 300, 10), unlist(entro_result), type = "l", 
+     xlab = "The number of observations", 
+     ylab = "The estimation of Shannon entropy H")
+
+```
+
+***Comment***
+
+The Shannon entropy H has a significant fluctuation with the increasing of 
+observations. The large Shannon entropy value means less information. Hence, it is difficult to know the location of the robot. In the graph, it can be seen that the Shannon entropy has a growing trend after 180 observations. Hence, the more observations can not be better to know where the robot is. 
+
+### 7
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#get the 100th filter probability
+pre_filter <- my_filter[, 100]
+#get transition matrix
+transi_matrix <- prob1
+#calculate the prediction probabilities
+pre_prob <- apply(transi_matrix, 2, function(x) sum(x * pre_filter))
+names(pre_prob) <- names(pre_filter)
+#present the result
+print("The probabilites of the hidden states for the time step 10 is:")
+cat("\n")
+print(pre_filter)
+cat("\n")
+print("The probabilites of the hidden states for the time step 101 is:")
+cat("\n")
+print(pre_prob)
+```
+
+# Appendix
+
+```{r ref.label=knitr::all_labels(), echo=TRUE  ,eval=FALSE , results=FALSE}
+
+```
