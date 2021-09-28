@@ -7,6 +7,10 @@ output:
   html_document: default
 ---
 
+## Contributions 
+
+**We solved all questions individually and discussed together, we wrote our comment together. Code are mainly from Yifan**
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(HMM)
@@ -84,32 +88,12 @@ print(paste("Accuracy of smooth:",acc_smooth) )
 acc_viterbi <- sum(viterbi_position == samples$states) / 100
 print(paste("Accuracy of viterbi:",acc_viterbi) )
 
-plot(filter_postion, type='l', col='red', xlab = 'Time', ylab = 'path')
-lines(samples$states, col='blue')
-lines(samples$observation, col='yellow')
-legend("topright", legend = c("Fitering", "States", "Observation"),
-         fill = c("red", "blue", "yellow"), cex = 0.8)
-
-
-plot(smooth_postion, type='l', col='red', xlab = 'Time', ylab = 'path')
-lines(samples$states, col='blue')
-lines(samples$observation, col='yellow')
-legend("topright", legend = c("Smoothing", "States", "Observation"),
-         fill = c("red", "blue", "yellow"), cex = 0.8)
-
-plot(viterbi_position, type='l', col='red')
-lines(samples$states, col='blue')
-lines(samples$observation, col='yellow')
-legend("topright", legend = c("Viterbi", "States", "Observation"),
-         fill = c("red", "blue", "yellow"), cex = 0.8)
-
-
 ```
 
 ## Q1.5
 
 ```{r}
-set.seed(1234)
+set.seed(123)
 repeat_size <- 100
 acc_filters <- c()
 acc_smooths <- c()
@@ -138,6 +122,12 @@ for (i in 1:repeat_size) {
   acc_viterbis <- c(acc_viterbis, acc_viterbi)
 }
 
+plot(density(acc_filters),main='Accuracy distribution', xlab = 'Accuracy', xlim=c(0.2,1), ylim=c(0,8), col='red')
+lines(density(acc_smooths),col='green')
+lines(density(acc_viterbis), col='black')
+legend("topright", legend = c("Filtering", "Smoothing", "Viterbi"),
+         fill = c("red", "green", "black"), cex = 0.8)
+
 avg_acc_filter <- mean(acc_filters)
 print(paste("Average accuracy of filtering:",avg_acc_filter) )
 avg_acc_smooth <- mean(acc_smooths)
@@ -163,7 +153,7 @@ The most probable path:
 
 $$Z_{max}^{0:T} = argmax_{z^{0:T}}P(Z^{0:T}|X^{0:T})$$
 
-Answer: Smoothed distribution is conditioning on all observations, while filtered distribution is only conditioning on up-to-date observations. Later observations should not effect previous state only if we know the exact physics model and correct observations, but here HMM is probabilistic estimation(we dont have exact physics model as well as correct observations). Therefore HMM is doing probabilistic estimation by Bayes theorem, but we believe state at time t+1, t+2...t+n are dependent on state at time t, therefore the posterior on more observations can be helpful in smoothing. For most probable path, this approach try to maximize joint probability of hidden state $P(Z^{0:T}|X^{0:T}$, which can not guarantee the best solution of each hidden state $P(z^t|X^{0:T})$.
+Answer: Smoothed distribution is conditioning on all observations, while filtered distribution is only conditioning on up-to-date observations. Later observations should not effect previous state only if we know the exact physics model and correct observations, but here HMM is probabilistic estimation(we dont have exact physics model as well as correct observations). HMM is doing probabilistic estimation by Bayes theorem, therefore the posterior on more observations can be beneficial to smoothing. For most probable path, this approach try to maximize joint probability of hidden state $P(Z^{0:T}|X^{0:T})$, which can not guarantee the best solution of each hidden state $P(z^t|X^{0:T})$(Smoothing).
 
 ## Q1.6
 ```{r}
@@ -178,7 +168,7 @@ legend("topright", legend = c("Fitering", "smotthing"),
 ```{r}
 Hs <- c()
 for (i in 1:90) {
-  joint_smoothing <- posterior(model, samples$observation[1:10+i])
+  joint_smoothing <- posterior(model, samples$observation[1:(10+i)])
   H <- entropy.empirical(joint_smoothing[ ,10])
   Hs <- c(Hs, H)
 }
@@ -187,8 +177,12 @@ plot(c(11:100), Hs, type = 'l', xlab = 'Number of Observations', ylab = 'Entropy
 ```
 
 $$H(x) = -\sum_{n=i}^{N}p_i(x)logp_i(x)$$
-According to Information theory, higher entropy indicate higher uncertainty, (i.e. an event happens with probability 1, means no uncertainty, entropy is 0), so the lower entropy the more confidence. Clearly, smoothing has lower entropy comparing filtering in most time point. But we also checked the trend of Entropy for a single time point at 10 with an increasing number of observations, we find the trend is quite flat, seems indicate entropy(uncertainty) doesn't decrease with more observations.
+According to Information theory, higher entropy indicate higher uncertainty, (i.e. an event happens with probability 1, means no uncertainty, entropy is 0), so the lower entropy the more confidence. Clearly, smoothing(more observations) has lower entropy comparing filtering in most time point. But we also checked the trend of Entropy for a single time point at 10 with an increasing number of observations, we find the trend first decrease then up, finally is a flat line, this seems indicate entropy(uncertainty) first go down with more recent observations, but further observations does not really matter.
 
+## Q1.7
+
+$$P(Z_{101}|X_{1:100}) = \sum_{Z_{100}} P(Z_{100}, Z_{101}|X_{1:100}) = \sum_{Z_{100}} P(Z_{100}|X_{1:100})P(Z_{101}|Z_{100})$$
+Notice $P(Z_{100}|X_{1:100})$ is the filtering distribution at time 100, $P(Z_{101}|Z_{100})$ is the transition probability. So, $P(Z_{101}|X_{1:100})$ is the linear combination of transition matrix with filtering distribution $ P(Z_{100}|X_{1:100})$, which in the row space of transition matrix.
 
 ```{r}
 Z_100= as.matrix(filtering[,100])

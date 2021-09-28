@@ -54,7 +54,7 @@ set.seed(1234)
 samples <- simHMM(model, 100)
 samples
 plot(samples$states, type='l', col='red')
-line(samples$observation, col='green')
+lines(samples$observation, col='green')
 ```
 
 ## Q1.3
@@ -100,7 +100,7 @@ lines(samples$observation, col='yellow')
 ## Q1.5
 
 ```{r}
-set.seed(1234)
+#set.seed(1234)
 repeat_size <- 100
 acc_filters <- c()
 acc_smooths <- c()
@@ -152,20 +152,21 @@ entropy_smooth <- lapply(c(1:100),function(i)entropy.empirical(smoothing[,i]))
 plot(unlist(entropy_filter), type='l', col='red')
 lines(unlist(entropy_smooth), col='green')
 ```
+```{r}
+samples$observation[1:10]
+```
 
 ```{r}
-Hs <- c()
-for (i in 1:90) {
-  fw <- exp(forward(model, samples$observation[1:10+i]))
-  bw <- exp(backward(model, samples$observation[1:10+i]))
-  posterior(model, samples$observation[1:10+i])
+entropy_10 <-function(i){
+  fw <- exp(forward(model, samples$observation[1:(10+i)]))
+  bw <- exp(backward(model, samples$observation[1:(10+i)]))
   smoothing <- prop.table(fw*bw, 2)
   H <- entropy.empirical(smoothing[ ,10])
-  Hs <- c(Hs, H)
+  return(H)
 }
-plot(Hs, type = 'l')
 
-
+Hs <- lapply(c(1:90),entropy_10)
+plot(unlist(Hs), type = 'l')
 ```
 
 $$H(x) = -\sum_{n=i}^{N}p_i(x)logp_i(x)$$
