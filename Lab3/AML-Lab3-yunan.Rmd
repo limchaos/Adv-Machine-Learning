@@ -90,10 +90,10 @@ GreedyPolicy <- function(x, y
   max_q_index = which(max_q == q_values)
   
   # action only from greedy policy
-  action0 = ifelse(length(max_q_index) > 1, sample(max_q_index, 1),max_q_index)
+  action = ifelse(length(max_q_index) > 1, sample(max_q_index, 1),max_q_index)
   
   
-  return(action0)
+  return(action)
 }
 
 
@@ -112,7 +112,7 @@ EpsilonGreedyPolicy <- function(x, y, epsilon){
   #   An action, i.e. integer in {1,2,3,4}.
   
   # Your code here.
-  action = ifelse(rnorm(1)>epsilon, GreedyPolicy(x,y), sample(1:4, 1))
+  action = ifelse(runif(1)>epsilon, GreedyPolicy(x,y), sample(1:4, 1))
   
   return(action)
 }
@@ -180,7 +180,7 @@ q_learning <- function(start_state, epsilon = 0.5, alpha = 0.1, gamma = 0.95,
     Q_old = q_table[start_state[1],start_state[2],action]
     Q_max=max(q_table[new_state[1],new_state[2],])
     temporal_difference = reward + gamma * Q_max - Q_old
-    q_table[new_state[1],new_state[2],action] <<- Q_old + alpha * temporal_difference  
+    q_table[start_state[1],start_state[2],action] <<- Q_old + alpha * temporal_difference  
     
     # accumulating correction for returning
     episode_correction = episode_correction + temporal_difference
