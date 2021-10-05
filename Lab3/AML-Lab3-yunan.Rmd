@@ -227,13 +227,32 @@ for(i in 1:10000){
 
 ```
 
-# Environment B (the effect of epsilon and gamma)
+
+
+
+**What has the agent learned after the first 10 episodes ?**
+
+After running several times of the code, in the first 10 episodes, no significant path is learned 
+
+
+**– Is the final greedy policy (after 10000 episodes) optimal for all states, i.e. not only for the initial state ? Why / Why not ?**
+
+After running several times of the code, sometimes an optimal one for all states can be achieved, but due to the randomness in EpsilonGreedyPolicy and transition_model, it is probable that some grids are not gone through sufficiently
+
+
+**Do the learned values in the Q-table reflect the fact that there are multiple paths (above and below the negative rewards) to get to the positive reward ? If not, what could be done to make it happen ?**
+
+After running several times, I found that there are multiple paths, e.g. in starting point(3,1), the next path can be on the left or the right.
+
+
+
+
+
+# Environment B 
 
 
 
 ```{r}
-
-
 
 H <- 7
 W <- 8
@@ -291,10 +310,28 @@ for(j in c(0.5,0.75,0.95)){
 
 ```
 
+The question shows the importance of keeping a good balance between exploitation and exploration, the former put emphasis on short-time benefit and the latter on long-term benefit. The related parameters here are epsilon and gamma.
+
+Gamma is the discount rate of future rewards, when gamma=0, the agent only focuses on immediate benefit, when gamma=1, it evaluates each of action based on the total sum of future rewards(so it is likely to spend lots of time). 
+
+Epsilon is used to choose exploration and exploitation randomly with the probability of epsilon and 1-epsilon,respectively.
 
 
 
-# Environment C (the effect of beta).
+When Gamma =(0.5,0.75,0.95) and epsilon=0.5, with gamma's increase, the long-term reward is aware of and the corresponding optimal path  is built finally.
+When gamma =0.5 and 0.75, the reward and correction go through a relatively increase and small fluctuation, compared with the adjustment when gamma=0.95,in which a significant increase in reward and change in correction  
+
+
+
+When epsilon=0.1, which means the agent mainly doing on exploitation, it is no hard to see that the sub-optimal is attained as a so-called ultimate goal
+
+
+
+
+
+
+
+# Environment C
 
 ```{r envc}
 H <- 3
@@ -319,6 +356,39 @@ for(j in c(0,0.2,0.4,0.66)){
 
 ```
 
+
+The aim to use beta seems to use the randomness to decrease the probability of dropping local optimun , dead loop and so on.
+however,beta, as the random factor of decided action, when it is too big, it can make the agent not pointed to the optimal state that should have pointed to, as shown in the last picture, when beta=0.66 
+
+
+
+
+
+# Environment D
+
+
+**Has the agent learned a good policy? Why / Why not ?**
+
+all the grids are accessed, it can be seen to learn a good policy
+
+**Could you have used the Q-learning algorithm to solve this task ?**
+
+No, the goal of Q-learning should be fixed. the sampled goal should be at first built by some model
+
+
+
+
+
+
+# Environment E
+
+*Has the agent learned a good policy? Why / Why not ?*
+
+No, the agent get lost the grids and it can't find the goal
+
+*If the results obtained for environments D and E differ, explain why*
+
+The agent in D can go to everywhere, but the one in E is limited by part of the grids,which is limited.
 
 
 
