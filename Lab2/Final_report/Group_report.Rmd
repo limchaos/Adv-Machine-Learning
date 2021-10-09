@@ -158,31 +158,18 @@ Answer: Smoothed distribution is conditioning on all observations, while filtere
 ## Q1.6
 ```{r}
 entropy_filter <- lapply(c(1:100),function(i)entropy.empirical(filtering[,i]))
-entropy_smooth <- lapply(c(1:100),function(i)entropy.empirical(smoothing[,i]))
 plot(unlist(entropy_filter), type='l', col='red', xlab = 'Time', ylab = 'Entropy')
-lines(unlist(entropy_smooth), col='green')
-legend("topright", legend = c("Fitering", "smotthing"),
-         fill = c("red", "green"), cex = 0.8)
-```
-
-```{r}
-Hs <- c()
-for (i in 1:90) {
-  joint_smoothing <- posterior(model, samples$observation[1:(10+i)])
-  H <- entropy.empirical(joint_smoothing[ ,10])
-  Hs <- c(Hs, H)
-}
-plot(c(11:100), Hs, type = 'l', xlab = 'Number of Observations', ylab = 'Entropy at time 10')
-
+legend("topright", legend = c("Fitering"),
+         fill = c("red"), cex = 0.8)
 ```
 
 $$H(x) = -\sum_{n=i}^{N}p_i(x)logp_i(x)$$
-According to Information theory, higher entropy indicate higher uncertainty, (i.e. an event happens with probability 1, means no uncertainty, entropy is 0), so the lower entropy the more confidence. Clearly, smoothing(more observations) has lower entropy comparing filtering in most time point. But we also checked the trend of Entropy for a single time point at 10 with an increasing number of observations, we find the trend first decrease then up, finally is a flat line, this seems indicate entropy(uncertainty) first go down with more recent observations, but further observations does not really matter.
+According to Information theory, higher entropy indicate higher uncertainty, (i.e. an event happens with probability 1, means no uncertainty, entropy is 0), so the lower entropy the more confidence. As in above plot, we have a very flat trend uncertainty with some disturbance, we didn't see clear increasing or decreasing trend, therefore we can't know better where the robot is in later time (higher confidence). 
 
 ## Q1.7
 
 $$P(Z_{101}|X_{1:100}) = \sum_{Z_{100}} P(Z_{100}, Z_{101}|X_{1:100}) = \sum_{Z_{100}} P(Z_{100}|X_{1:100})P(Z_{101}|Z_{100})$$
-Notice $P(Z_{100}|X_{1:100})$ is the filtering distribution at time 100, $P(Z_{101}|Z_{100})$ is the transition probability. So, $P(Z_{101}|X_{1:100})$ is the linear combination of transition matrix with filtering distribution $ P(Z_{100}|X_{1:100})$, which in the row space of transition matrix.
+Notice $P(Z_{100}|X_{1:100})$ is the filtering distribution at time 100, $P(Z_{101}|Z_{100})$ is the transition probability. So, $P(Z_{101}|X_{1:100})$ is the linear combination of transition matrix with filtering distribution $P(Z_{100}|X_{1:100})$, which in the row space of transition matrix.
 
 ```{r}
 Z_100= as.matrix(filtering[,100])

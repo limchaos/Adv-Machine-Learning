@@ -146,31 +146,16 @@ Why ?**
 Answer: Smoothed distribution is conditioning on all observations, while filtered distribution is only conditioning on up-to-date observations. Later observations should not effect previous state only if we know the exact physics model and correct observations, but here HMM is probabilistic estimation(we dont have exact physics model as well as correct observations). Therefore HMM is doing probabilistic estimation by Bayes theorem, but we believe state at time t+1, t+2...t+n are dependent on state at time t, therefore the posterior on later observations can be helpful.
 
 ## Q1.6
+
 ```{r}
 entropy_filter <- lapply(c(1:100),function(i)entropy.empirical(filtering[,i]))
-entropy_smooth <- lapply(c(1:100),function(i)entropy.empirical(smoothing[,i]))
-plot(unlist(entropy_filter), type='l', col='red')
-lines(unlist(entropy_smooth), col='green')
-```
-```{r}
-samples$observation[1:10]
-```
-
-```{r}
-entropy_10 <-function(i){
-  fw <- exp(forward(model, samples$observation[1:(10+i)]))
-  bw <- exp(backward(model, samples$observation[1:(10+i)]))
-  smoothing <- prop.table(fw*bw, 2)
-  H <- entropy.empirical(smoothing[ ,10])
-  return(H)
-}
-
-Hs <- lapply(c(1:90),entropy_10)
-plot(unlist(Hs), type = 'l')
+plot(unlist(entropy_filter), type='l', col='red', xlab = 'Time', ylab = 'Entropy')
+legend("topright", legend = c("Fitering"),
+         fill = c("red"), cex = 0.8)
 ```
 
 $$H(x) = -\sum_{n=i}^{N}p_i(x)logp_i(x)$$
-According to Information theory, higher entropy indicate higher uncertainty, (i.e. an event happens with probability 1, means no uncertainty, entropy is 0), so the lower entropy the more confidence.
+According to Information theory, higher entropy indicate higher uncertainty, (i.e. an event happens with probability 1, means no uncertainty, entropy is 0), so the lower entropy the more confidence. As in above plot, we have a very flat trend uncertainty with some disturbance, we didn't see clear increasing or decreasing trend, therefore we can't know better where the robot is in later time (higher confidence).
 
 
 ```{r}
