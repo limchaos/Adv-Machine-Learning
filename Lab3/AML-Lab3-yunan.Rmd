@@ -71,8 +71,7 @@ vis_environment <- function(iterations=0, epsilon = 0.5, alpha = 0.1, gamma = 0.
 
 #a1-p2-GreedyPolicy}------------------------------------------------------------------------------
 
-GreedyPolicy <- function(x, y
-                         ){
+GreedyPolicy <- function(x, y){
   
   # Get a greedy action for state (x,y) from q_table.
   #
@@ -112,7 +111,7 @@ EpsilonGreedyPolicy <- function(x, y, epsilon){
   #   An action, i.e. integer in {1,2,3,4}.
   
   # Your code here.
-  action = ifelse(runif(1)>epsilon, GreedyPolicy(x,y), sample(1:4, 1))
+  action = ifelse(runif(1)>epsilon, GreedyPolicy(x,y), sample(1:4, 1))    # random walking with epsilon
   
   return(action)
 }
@@ -129,7 +128,7 @@ transition_model <- function(x, y, action, beta){
   # Args:
   #   x, y: state coordinates.
   #   action: which action the agent takes (in {1,2,3,4}).
-  #   beta: probability of the agent slipping to the side when trying to move.
+  #   beta: probability of the agent slipping to the side when trying to move.   ####duosun
   #   H, W (global variables): environment dimensions.
   # 
   # Returns:
@@ -138,7 +137,7 @@ transition_model <- function(x, y, action, beta){
   delta <- sample(-1:1, size = 1, prob = c(0.5*beta,1-beta,0.5*beta))
   final_action <- ((action + delta + 3) %% 4) + 1   ### think about it ？
   foo <- c(x,y) + unlist(action_deltas[final_action])     ### action_deltas, see...？
-  foo <- pmax(c(1,1),pmin(foo,c(H,W)))   ### https://statisticsglobe.com/pmax-pmin-r-function-example/
+  foo <- pmax(c(1,1),pmin(foo,c(H,W)))   ### https://statisticsglobe.com/pmax-pmin-r-function-example/    #!!!!------------------------
   
   return (foo)
 }
@@ -154,7 +153,7 @@ q_learning <- function(start_state, epsilon = 0.5, alpha = 0.1, gamma = 0.95,
   # 
   # Args:
   #   start_state: array with two entries, describing the starting position of the agent.
-  #   epsilon (optional): probability of acting greedily.
+  #   epsilon (optional): probability of acting greedily.------------------------------------------------------------------------typo
   #   alpha (optional): learning rate.
   #   gamma (optional): discount factor.
   #   beta (optional): slipping factor.
@@ -195,8 +194,6 @@ q_learning <- function(start_state, epsilon = 0.5, alpha = 0.1, gamma = 0.95,
   }
   
 }
-
-
 ```
 
 
@@ -232,18 +229,19 @@ for(i in 1:10000){
 
 **What has the agent learned after the first 10 episodes ?**
 
-After running several times of the code, in the first 10 episodes, no significant path is learned 
+In the first 10 episodes, the agent can learn some reward information in some states, especially, it can detects the states of negative reward; More over, in some rerunning times, the goal state can also be hit a little.   
+
 
 
 **– Is the final greedy policy (after 10000 episodes) optimal for all states, i.e. not only for the initial state ? Why / Why not ?**
 
-After running several times of the code, sometimes an optimal one for all states can be achieved, but due to the randomness in EpsilonGreedyPolicy and transition_model, it is probable that some grids are not gone through sufficiently
+Seeing from  the graph of after-10000-iterations, the paths only given arrow directions and the corresponding expected rewards from starting point to the goal have reached optimal polices for all states involved.
 
 
 **Do the learned values in the Q-table reflect the fact that there are multiple paths (above and below the negative rewards) to get to the positive reward ? If not, what could be done to make it happen ?**
 
-After running several times, I found that there are multiple paths, e.g. in starting point(3,1), the next path can be on the left or the right.
 
+The q-table, as a guidance book to good paths, updates with episodes' increasing, seeing from the graph of after-10000-iterations, we can see that from starting point to the goal point, there are multiple paths with positive rewards.
 
 
 
@@ -317,18 +315,11 @@ Gamma is the discount rate of future rewards, when gamma=0, the agent only focus
 Epsilon is used to choose exploration and exploitation randomly with the probability of epsilon and 1-epsilon,respectively.
 
 
-
-When Gamma =(0.5,0.75,0.95) and epsilon=0.5, with gamma's increase, the long-term reward is aware of and the corresponding optimal path  is built finally.
-When gamma =0.5 and 0.75, the reward and correction go through a relatively increase and small fluctuation, compared with the adjustment when gamma=0.95,in which a significant increase in reward and change in correction  
-
+When Gamma =(0.5,0.75,0.95) and epsilon=0.5, with gamma's increase, the long-term reward is aware of faster and faster;when gamma =0.5 and 0.75, the reward and correction go through a relatively increase and small fluctuation, for instance, we can see the moving average reward tends to go beyond 5, in the related graphs, we can find the direction near short-term reward [4,5] begins to point toward the long-term goal; to the case gamma=0.95,due to the big weight, the long-term reward
+can be learned much faster, so we can see a big leap in moving average graph.
 
 
 When epsilon=0.1, which means the agent mainly doing on exploitation, it is no hard to see that the sub-optimal is attained as a so-called ultimate goal
-
-
-
-
-
 
 
 # Environment C
@@ -357,8 +348,7 @@ for(j in c(0,0.2,0.4,0.66)){
 ```
 
 
-The aim to use beta seems to use the randomness to decrease the probability of dropping local optimun , dead loop and so on.
-however,beta, as the random factor of decided action, when it is too big, it can make the agent not pointed to the optimal state that should have pointed to, as shown in the last picture, when beta=0.66 
+Beta, as the parameter to represent the system randomness to a final action in a state which maybe caused by some known or unknown factors, when it is too big, it can make the agent deviate from optimal states that should have pointed to, as shown in the last picture, when beta=0.66. 
 
 
 
@@ -373,22 +363,20 @@ all the grids are accessed, it can be seen to learn a good policy
 
 **Could you have used the Q-learning algorithm to solve this task ?**
 
-No, the goal of Q-learning should be fixed. the sampled goal should be at first built by some model
-
-
-
-
+No.
+Q-learning, as some kind of deterministic rather than parametric model,  needs the agent to reach some fixed goals by going through(consulting) concrete states and actions. If the the goals are not existent in training process, the algorithm does not make any inductive(like statistical)inference to it and can't give a suggesting path to it.  
 
 
 # Environment E
 
 *Has the agent learned a good policy? Why / Why not ?*
 
-No, the agent get lost the grids and it can't find the goal
+No, the agent has been stuck/lost in some grids which are hard to reach the goal
 
 *If the results obtained for environments D and E differ, explain why*
 
-The agent in D can go to everywhere, but the one in E is limited by part of the grids,which is limited.
+The reinforce method used in D and E belongs to parametric learning models and it aims to learn a model with good generalization ability. Since the learned model effect strongly depends on the actual pattern of the data used to learn. In D, the training data and test data are much more similar than that in E. According to the actual data,in D, the training and test data distributions are quite similar and even nearly identical, so the result are good, however in E,  the training and test data distributions are quite different, so the learned model trained does not apply well to test data.
+
 
 
 
