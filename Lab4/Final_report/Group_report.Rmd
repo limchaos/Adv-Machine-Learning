@@ -131,11 +131,11 @@ When change l from 0.3 to 1, we got a smoother curve, this is because when we ha
 
 ```{r}
 df <- read.csv("TempTullinge.csv", sep=";", header=TRUE)
-time <- seq(1, 2190)
-time <- (time -mean(time)) / sd(time)
-day <- rep(1:365,6)
-day <- (day -mean(day)) / sd(day)
+time <- seq(1, 2190, 5)
+df = df[time,]
 df$time <- time
+day <- rep(seq(1, 365, 5), 6)
+df$day <- day
 
 RBFkernel <- function(sigmaf = 1, ell = 1) {
   rval <- function(x, y = NULL) {
@@ -158,44 +158,59 @@ kernelMatrix(kernel = SEkernel, x = X, y = Xstar)
 ## Q3.2
 ```{r}
 temp <- df$temp
-plot(time, temp, ylim=c(-30, 30))
+temp <- (temp - mean(temp)) / sd(temp)
+time <- (time - mean(time)) / sd(time)
+day <- (day - mean(day)) / sd(day)
 
+plot(df$time, df$temp, ylim=c(-30, 30), xlab='time', ylab='temp')
 polyFit <- lm(temp ~  time + I(time^2))
 sigmaNoise <- sd(polyFit$residuals)
 sigmaf <- 20
 ell <- 0.2
 RBF <- RBFkernel(sigmaf = sigmaf, ell=ell)
 GPfit <- gausspr(time, temp, kernel = RBF, var = sigmaNoise^2)
-meanPred <- predict(GPfit, time) 
-lines(time, meanPred, lwd = 2, col='blue')
+extr_time <- seq(2191, 8*365, 5)
+extr_time_norm <- (extr_time - mean(df$time)) / sd(df$time)
+
+meanPred <- predict(GPfit, time)
+EXTmeanPred <- predict(GPfit, extr_time_norm)
+
+lines(df$time, meanPred * sd(df$temp) + mean(df$temp), lwd = 2, col='blue')
+
 
 x<-time
-xs<-time # XStar.
+xs<-time 
 n <- length(x)
 Kss <- kernelMatrix(kernel = RBF, x = xs, y = xs)
 Kxx <- kernelMatrix(kernel = RBF, x = x, y = x)
 Kxs <- kernelMatrix(kernel = RBF, x = x, y = xs)
 Covf = Kss-t(Kxs)%*%solve(Kxx + sigmaNoise^2*diag(n), Kxs) # Covariance matrix of fStar.
-lines(xs, meanPred - 1.96*sqrt(diag(Covf)), col = "red", lwd = 2)
-lines(xs, meanPred + 1.96*sqrt(diag(Covf)), col = "red", lwd = 2)
+ub <- meanPred + 1.96*sqrt(diag(Covf))
+lb <- meanPred - 1.96*sqrt(diag(Covf))
+
+lines(df$time, lb * sd(df$temp) + mean(df$temp), col = "red", lwd = 2)
+lines(df$time, ub * sd(df$temp) + mean(df$temp), col = "red", lwd = 2)
 legend("bottomright", legend=c("Ground Truth","Pred Mean ","+1.96 Std", "-1.96 Std"),
         lwd=c(1,1,1,1), col=c("black","blue","red","red"))
 ```
 
 ```{r}
-temp <- df$temp
-plot(time, temp, ylim=c(-30, 30))
 
-polyFit <- lm(temp ~  time + I(time^2))
-sigmaNoise <- sd(polyFit$residuals)
+extr_day <- rep(seq(1, 365, 5), 2)
+extr_day_norm <- (extr_day - mean(df$day)) / sd(df$day)
+
 sigmaf <- 20
 ell <- 0.2
 RBF <- RBFkernel(sigmaf = sigmaf, ell=ell)
 GPfit_day <- gausspr(day, temp, kernel = RBF, var = sigmaNoise^2)
 meanPred_day <- predict(GPfit_day, day)
-plot(time, temp, ylim=c(-30, 30))
-lines(time, meanPred, lwd = 2, col='red')
-lines(time, meanPred_day, lwd = 2, col='blue')
+EXTmeanPred_day <- predict(GPfit_day, extr_day_norm)
+
+plot(df$time, df$temp, ylim=c(-30, 30), xlab='time', ylab='temp', xlim=c(0, 8*365))
+lines(df$time, meanPred * sd(df$temp) + mean(df$temp), lwd = 2, col='red')
+lines(extr_time, EXTmeanPred * sd(df$temp) + mean(df$temp), lwd = 2, col='red')
+lines(df$time, meanPred_day * sd(df$temp) + mean(df$temp), lwd = 2, col='blue')
+lines(extr_time, EXTmeanPred_day * sd(df$temp) + mean(df$temp), lwd = 2, col='blue')
 legend("bottomright", legend=c("Ground Truth","Pred Mean Time ","Pred Mean Day"),
         lwd=c(1,1,1), col=c("black","red","blue"))
 ```
@@ -208,8 +223,8 @@ GP on the whole time period, this allow us to prediction temperature only based 
 
 * Day:
 
-GP on the whole single year, this approach might introduce some ambiguities, it has the same day as input but multiple outputs. This approach seems assuming temperature will always be the same on the same day in different years. 
-
+GP on the whole single year, this is actually a GP on the mean temperature of each day over 6 years, so we can see above
+plot, the blue line just repeat the same pattern in every year. This is because our GP only learned the average temperature for each day over 6 years.
 
 ## Q3.5
 
@@ -232,10 +247,15 @@ d <- 365 / sd(c(1:2190))
 RBF_P <- RBFPeriodickernel(sigmaf = sigmaf, ell1 = ell1, ell2 = ell2, d = d)
 GPfit_PK <- gausspr(time, temp, kernel = RBF_P, var = sigmaNoise^2)
 meanPred_PK <- predict(GPfit_PK, time)
-plot(time, temp, ylim=c(-30, 30))
-lines(time, meanPred, lwd = 2, col='red')
-lines(time, meanPred_day, lwd = 2, col='blue')
-lines(time, meanPred_PK, lwd = 2, col='green')
+EXTmeanPred_PK <- predict(GPfit_PK, extr_time_norm)
+plot(df$time, df$temp, ylim=c(-30, 30), xlab='time', ylab='temp', xlim=c(0, 8*365))
+lines(df$time, meanPred * sd(df$temp) + mean(df$temp), lwd = 2, col='red')
+lines(extr_time, EXTmeanPred * sd(df$temp) + mean(df$temp), lwd = 2, col='red')
+lines(df$time, meanPred_day * sd(df$temp) + mean(df$temp), lwd = 2, col='blue')
+lines(extr_time, EXTmeanPred_day * sd(df$temp) + mean(df$temp), lwd = 2, col='blue')
+lines(df$time, meanPred_PK * sd(df$temp) + mean(df$temp), lwd = 2, col='green')
+lines(extr_time, EXTmeanPred_PK * sd(df$temp) + mean(df$temp), lwd = 2, col='green')
+
 legend("bottomright", legend=c("Ground Truth","Pred Mean Time ","Pred Mean Day", "Periodic Kernel"),
         lwd=c(1,1,1,1), col=c("black","red","blue","green"))
 ```
